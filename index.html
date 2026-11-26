@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A simple to-do list that saves your tasks in this browser.">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>My To-Do List</title>
+  <style>
+    :root {
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #172033;
+      background: #f5f7fb;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      padding: 3rem 1rem;
+      background: radial-gradient(circle at 15% 0%, #dbeafe 0, transparent 30rem), #f5f7fb;
+    }
+
+    .app {
+      width: min(100%, 42rem);
+      margin: 0 auto;
+      padding: clamp(1.25rem, 5vw, 2.5rem);
+      border: 1px solid #e5eaf2;
+      border-radius: 1.5rem;
+      background: #fff;
+      box-shadow: 0 24px 70px rgb(15 23 42 / 9%);
+    }
+
+    .eyebrow { margin: 0 0 0.5rem; color: #2563eb; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(2rem, 7vw, 3rem); letter-spacing: -0.05em; }
+    .subtitle { margin: 0.6rem 0 1.8rem; color: #64748b; line-height: 1.6; }
+
+    form { display: flex; gap: 0.65rem; }
+    input, button { min-height: 3rem; border-radius: 0.75rem; font: inherit; }
+    #task-input { min-width: 0; flex: 1; padding: 0 0.9rem; border: 1px solid #cbd5e1; color: #172033; }
+    #task-input::placeholder { color: #94a3b8; }
+    button { padding: 0 1rem; border: 0; background: #2563eb; color: #fff; font-weight: 700; cursor: pointer; transition: background 150ms ease, transform 150ms ease; }
+    button:hover { background: #1d4ed8; }
+    button:active { transform: translateY(1px); }
+    button:focus-visible, input:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin: 1.4rem 0 0.75rem; }
+    #remaining-count { color: #64748b; font-size: 0.9rem; }
+    .filters { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+    .filter-button { min-height: 2.25rem; padding: 0 0.7rem; border: 1px solid transparent; background: transparent; color: #64748b; font-size: 0.85rem; }
+    .filter-button:hover { background: #f1f5f9; color: #172033; }
+    .filter-button[aria-pressed="true"] { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
+
+    #task-list { display: grid; gap: 0.65rem; margin: 0; padding: 0; list-style: none; }
+    .task { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem; border: 1px solid #e5eaf2; border-radius: 0.8rem; }
+    .task-checkbox { width: 1.2rem; height: 1.2rem; flex: 0 0 auto; accent-color: #2563eb; cursor: pointer; }
+    .task-text { min-width: 0; flex: 1; overflow-wrap: anywhere; line-height: 1.45; }
+    .task.completed .task-text { color: #94a3b8; text-decoration: line-through; }
+    .delete-button { min-height: 2.25rem; padding: 0 0.7rem; background: transparent; color: #64748b; font-size: 0.85rem; }
+    .delete-button:hover { background: #fef2f2; color: #b91c1c; }
+
+    #empty-state { padding: 2.25rem 1rem; color: #94a3b8; text-align: center; }
+    #empty-state p { margin: 0; }
+    .footer { display: flex; justify-content: flex-end; margin-top: 1rem; }
+    #clear-completed { min-height: 2.5rem; padding: 0 0.7rem; background: transparent; color: #64748b; font-size: 0.85rem; }
+    #clear-completed:hover { background: #f1f5f9; color: #172033; }
+    #storage-note { margin: 1.4rem 0 0; color: #94a3b8; font-size: 0.78rem; text-align: center; }
+
+    @media (max-width: 28rem) {
+      form { flex-direction: column; }
+      form button { width: 100%; }
+      .toolbar { align-items: flex-start; flex-direction: column; }
+      .filters { width: 100%; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <p class="eyebrow">A little more focus</p>
+    <h1>My To-Do List</h1>
+    <p class="subtitle">Capture what needs doing. Your tasks are saved automatically in this browser.</p>
+
+    <form id="task-form">
+      <label for="task-input" class="visually-hidden" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">New task</label>
+      <input id="task-input" name="task" type="text" maxlength="200" placeholder="What needs to get done?" autocomplete="off" required>
+      <button type="submit">Add task</button>
+    </form>
+
+    <section aria-label="Your tasks">
+      <div class="toolbar">
+        <span id="remaining-count" aria-live="polite">0 tasks left</span>
+        <div class="filters" role="group" aria-label="Filter tasks">
+          <button type="button" class="filter-button" data-filter="all" aria-pressed="true">All</button>
+          <button type="button" class="filter-button" data-filter="active" aria-pressed="false">Active</button>
+          <button type="button" class="filter-button" data-filter="completed" aria-pressed="false">Completed</button>
+        </div>
+      </div>
+      <ul id="task-list"></ul>
+      <div id="empty-state"><p>No tasks here yet. Add one above to get started.</p></div>
+    </section>
+
+    <div class="footer">
+      <button id="clear-completed" type="button">Clear completed</button>
+    </div>
+    <p id="storage-note">Saved on this device using local storage.</p>
+  </main>
+
+  <script>
+    (() => {
+      const STORAGE_KEY = "simple-todo-tasks-v1";
+      const form = document.querySelector("#task-form");
+      const input = document.querySelector("#task-input");
+      const list = document.querySelector("#task-list");
+      const count = document.querySelector("#remaining-count");
+      const emptyState = document.querySelector("#empty-state");
+      const clearCompletedButton = document.querySelector("#clear-completed");
+      const filterButtons = [...document.querySelectorAll("[data-filter]")];
+      let filter = "all";
+      let tasks = loadTasks();
+
+      function loadTasks() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+          if (!Array.isArray(saved)) return [];
+          return saved.filter((task) =>
+            task && typeof task.id === "string" && typeof task.text === "string" && typeof task.completed === "boolean"
+          );
+        } catch {
+          return [];
+        }
+      }
+
+      function saveTasks() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+        } catch {
+          document.querySelector("#storage-note").textContent = "Browser storage is unavailable; tasks may not be saved.";
+        }
+      }
+
+      function render() {
+        const visibleTasks = tasks.filter((task) => {
+          if (filter === "active") return !task.completed;
+          if (filter === "completed") return task.completed;
+          return true;
+        });
+        const remaining = tasks.filter((task) => !task.completed).length;
+        count.textContent = `${remaining} ${remaining === 1 ? "task" : "tasks"} left`;
+        list.replaceChildren();
+        emptyState.hidden = visibleTasks.length > 0;
+        emptyState.querySelector("p").textContent = tasks.length === 0
+          ? "No tasks here yet. Add one above to get started."
+          : "No tasks match this filter.";
+
+        for (const task of visibleTasks) {
+          const item = document.createElement("li");
+          item.className = `task${task.completed ? " completed" : ""}`;
+
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.className = "task-checkbox";
+          checkbox.checked = task.completed;
+          checkbox.setAttribute("aria-label", `${task.completed ? "Mark as active" : "Complete"}: ${task.text}`);
+          checkbox.addEventListener("change", () => {
+            task.completed = checkbox.checked;
+            saveTasks();
+            render();
+          });
+
+          const text = document.createElement("span");
+          text.className = "task-text";
+          text.textContent = task.text;
+
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "delete-button";
+          remove.textContent = "Delete";
+          remove.setAttribute("aria-label", `Delete task: ${task.text}`);
+          remove.addEventListener("click", () => {
+            tasks = tasks.filter((entry) => entry.id !== task.id);
+            saveTasks();
+            render();
+          });
+
+          item.append(checkbox, text, remove);
+          list.append(item);
+        }
+      }
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+        tasks.unshift({
+          id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          text,
+          completed: false
+        });
+        saveTasks();
+        render();
+        form.reset();
+        input.focus();
+      });
+
+      filterButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          filter = button.dataset.filter;
+          filterButtons.forEach((candidate) => candidate.setAttribute("aria-pressed", String(candidate === button)));
+          render();
+        });
+      });
+
+      clearCompletedButton.addEventListener("click", () => {
+        tasks = tasks.filter((task) => !task.completed);
+        saveTasks();
+        render();
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>
